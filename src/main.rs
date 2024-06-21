@@ -12,9 +12,13 @@ fn main() {
         stdin.read_line(&mut input).unwrap();
 
         // Check if command is known
-        let (cmd_name, _cmd_args) = input.split_once(' ').unwrap_or_else(|| (input.trim(), ""));
+        let (cmd_name, cmd_args) = input.split_once(' ').unwrap_or((&input, ""));
+        let cmd_name = cmd_name.trim();
+        let cmd_args = cmd_args.trim();
+
         match cmd_name {
             "exit" => break,
+            "echo" => println!("{cmd_args}"),
             _ => println!("{cmd_name}: command not found"),
         }
     }
