@@ -1,6 +1,8 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
+const BUILTINS: [&str; 3] = ["exit", "echo", "type"];
+
 fn main() {
     loop {
         print!("$ ");
@@ -31,10 +33,19 @@ fn main() {
                     .trim()
             ),
             "type" => {
-                let first_arg = *input_split.get(1).expect("Type called without arguments");
-                match first_arg {
-                    "type" | "echo" | "exit" => println!("{} is a shell builtin", first_arg),
-                    _ => println!("{}: not found", first_arg),
+                let arg1 = *input_split.get(1).expect("Type called without arguments");
+                if BUILTINS.iter().any(|&s| s == arg1) {
+                    println!("{arg1} is a shell builtin");
+                } else {
+                    let dirs = env!("PATH").split(':').filter(|s| !s.is_empty());
+                    let path = dirs
+                        .map(|dir| std::path::Path::new(dir).join(arg1))
+                        .find(|p| p.is_file());
+                    if let Some(path) = path {
+                        println!("{} is {}", arg1, path.display());
+                    } else {
+                        println!("{arg1}: not found");
+                    }
                 }
             }
             _ => println!("{cmd_name}: command not found"),
