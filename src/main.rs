@@ -2,7 +2,7 @@
 use std::io::{self, Write};
 use std::process::Command;
 
-const BUILTINS: [&str; 3] = ["exit", "echo", "type"];
+const BUILTINS: [&str; 4] = ["exit", "echo", "type", "pwd"];
 
 fn search_absolute_path_in_path_var(cmd_name: &str) -> Option<std::path::PathBuf> {
     let dirs = env!("PATH").split(':').filter(|s| !s.is_empty());
@@ -52,7 +52,10 @@ fn main() {
                         println!("{arg1}: not found");
                     }
                 }
-            }
+            },
+            "pwd" => {
+                println!("{}", std::env::current_dir().unwrap().display());
+            },
             cmd_name => {
                 if let Some(path) = search_absolute_path_in_path_var(cmd_name) {
                     let mut args = input_split.iter();
