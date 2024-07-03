@@ -1,7 +1,16 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::process::Command;
 
 const BUILTINS: [&str; 3] = ["exit", "echo", "type"];
+
+fn search_absolute_path_in_path_var(cmd_name: &str) -> Option<std::path::PathBuf> {
+    let dirs = env!("PATH").split(':').filter(|s| !s.is_empty());
+    let path = dirs
+        .map(|dir| std::path::Path::new(dir).join(cmd_name))
+        .find(|p| p.is_file());
+    path
+}
 
 fn main() {
     loop {
@@ -37,18 +46,27 @@ fn main() {
                 if BUILTINS.iter().any(|&s| s == arg1) {
                     println!("{arg1} is a shell builtin");
                 } else {
-                    let dirs = env!("PATH").split(':').filter(|s| !s.is_empty());
-                    let path = dirs
-                        .map(|dir| std::path::Path::new(dir).join(arg1))
-                        .find(|p| p.is_file());
-                    if let Some(path) = path {
+                    if let Some(path) = search_absolute_path_in_path_var(arg1) {
                         println!("{} is {}", arg1, path.display());
                     } else {
                         println!("{arg1}: not found");
                     }
                 }
             }
-            _ => println!("{cmd_name}: command not found"),
+            cmd_name => {
+                if let Some(path) = search_absolute_path_in_path_var(cmd_name) {
+                    let mut args = input_split.iter();
+                    args.next();
+                    let mut cmd = Command::new(path);
+                    for arg in args {
+                        cmd.arg(arg);
+                    }
+                    let output = cmd.output().expect("External command failed");
+                    print!("{}", String::from_utf8_lossy(&output.stdout));
+                } else {
+                    println!("{cmd_name}: command not found");
+                }
+            }
         }
     }
 }
