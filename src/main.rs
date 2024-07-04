@@ -1,15 +1,21 @@
-#[allow(unused_imports)]
 use std::io::{self, Write};
 use std::process::Command;
 
-const BUILTINS: [&str; 4] = ["exit", "echo", "type", "pwd"];
+mod builtins;
+use builtins::{cmd_cd, cmd_echo, cmd_pwd, cmd_type};
 
-fn search_absolute_path_in_path_var(cmd_name: &str) -> Option<std::path::PathBuf> {
-    let dirs = env!("PATH").split(':').filter(|s| !s.is_empty());
-    let path = dirs
-        .map(|dir| std::path::Path::new(dir).join(cmd_name))
-        .find(|p| p.is_file());
-    path
+use crate::utils::search_in_path;
+
+mod constants;
+mod utils;
+
+fn execute_external_command(cmd_path: std::path::PathBuf, input_split: Vec<&str>) {
+    let mut cmd = Command::new(cmd_path);
+    for arg in input_split.iter().skip(1) {
+        cmd.arg(arg);
+    }
+    let output = cmd.output().expect("External command failed");
+    print!("{}", String::from_utf8_lossy(&output.stdout));
 }
 
 fn main() {
@@ -22,50 +28,25 @@ fn main() {
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
 
-        let input_split: Vec<&str> = input
+        let argv: Vec<&str> = input
             .split(char::is_whitespace)
-            .filter(|&s| s != "")
+            .filter(|s| !s.is_empty())
             .collect();
-        if input_split.len() < 1 {
-            break;
+        let argc = argv.len();
+        if argc < 1 {
+            continue;
         }
-        let cmd_name = input_split[0];
+        let cmd_name = argv[0];
 
         match cmd_name {
             "exit" => break,
-            "echo" => println!(
-                "{}",
-                input
-                    .split_once(char::is_whitespace)
-                    .expect("Something's fishy")
-                    .1
-                    .trim()
-            ),
-            "type" => {
-                let arg1 = *input_split.get(1).expect("Type called without arguments");
-                if BUILTINS.iter().any(|&s| s == arg1) {
-                    println!("{arg1} is a shell builtin");
-                } else {
-                    if let Some(path) = search_absolute_path_in_path_var(arg1) {
-                        println!("{} is {}", arg1, path.display());
-                    } else {
-                        println!("{arg1}: not found");
-                    }
-                }
-            },
-            "pwd" => {
-                println!("{}", std::env::current_dir().unwrap().display());
-            },
+            "echo" => cmd_echo(argv),
+            "type" => cmd_type(argv),
+            "pwd" => cmd_pwd(),
+            "cd" => cmd_cd(argv),
             cmd_name => {
-                if let Some(path) = search_absolute_path_in_path_var(cmd_name) {
-                    let mut args = input_split.iter();
-                    args.next();
-                    let mut cmd = Command::new(path);
-                    for arg in args {
-                        cmd.arg(arg);
-                    }
-                    let output = cmd.output().expect("External command failed");
-                    print!("{}", String::from_utf8_lossy(&output.stdout));
+                if let Some(path) = search_in_path(cmd_name) {
+                    execute_external_command(path, argv);
                 } else {
                     println!("{cmd_name}: command not found");
                 }
